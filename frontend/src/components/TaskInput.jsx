@@ -1,21 +1,25 @@
 import { useState } from "react";
 import { parseTaskAI } from "../services/api";
+import toast from "react-hot-toast";
 
 export default function TaskInput({ onTaskAdded }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      toast.error("Please enter a task first.");
+      return;
+    }
     setLoading(true);
-    setError("");
+    const toastId = toast.loading("AI is parsing your task...");
     try {
-      await parseTaskAI(text);
+      const res = await parseTaskAI(text);
+      toast.success(`Task added: "${res.data.title}"`, { id: toastId });
       setText("");
       onTaskAdded();
     } catch (err) {
-      setError("Failed to parse task. Try again.");
+      toast.error("Failed to parse task. Try again.", { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -49,12 +53,6 @@ export default function TaskInput({ onTaskAdded }) {
           {loading ? "PARSING..." : "+ ADD"}
         </button>
       </div>
-      {error && <p style={{ color: "#E24B4A", fontSize: "11px", marginTop: "6px" }}>{error}</p>}
-      {loading && (
-        <p style={{ color: "#1D9E75", fontSize: "11px", marginTop: "6px", fontStyle: "italic" }}>
-          AI is parsing your task...
-        </p>
-      )}
     </div>
   );
 }

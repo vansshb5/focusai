@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { getTasks, getDailyPlan, getDailyReview } from "./services/api";
+import { getTasks, getDailyPlan, getDailyReview, getStats } from "./services/api";
 import TaskInput from "./components/TaskInput";
 import TaskList from "./components/TaskList";
 import Planner from "./components/Planner";
+import Analytics from "./components/Analytics";
+import toast from "react-hot-toast";
 
-const s = {
+const styles = {
   topbar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "14px 20px", borderBottom: "0.5px solid #2a2a2a", background: "#0e0e0e"
@@ -24,23 +26,37 @@ const s = {
 };
 
 export default function App() {
-  const [tasks, setTasks] = useState([]);
-  const [plan, setPlan] = useState([]);
-  const [review, setReview] = useState(null);
+  const [tasks, setTasks]       = useState([]);
+  const [plan, setPlan]         = useState([]);
+  const [review, setReview]     = useState(null);
+  const [statsData, setStatsData] = useState(null);
+  const [activeTab, setActiveTab] = useState("tasks");
+  const [filter, setFilter]     = useState("all");
   const [timerSecs, setTimerSecs] = useState(25 * 60);
-  const [running, setRunning] = useState(false);
-  const [time, setTime] = useState("");
-  const intervalRef = useRef(null);
+  const [running, setRunning]   = useState(false);
+  const [time, setTime]         = useState("");
+  const intervalRef             = useRef(null);
 
   const fetchAll = async () => {
-    const [t, p] = await Promise.all([getTasks(), getDailyPlan()]);
-    setTasks(t.data);
-    setPlan(p.data);
+    try {
+      const [t, p, st] = await Promise.all([getTasks(), getDailyPlan(), getStats()]);
+      setTasks(t.data);
+      setPlan(p.data);
+      setStatsData(st.data);
+    } catch (err) {
+      toast.error("Failed to load data.");
+    }
   };
 
   const fetchReview = async () => {
-    const r = await getDailyReview();
-    setReview(r.data);
+    const toastId = toast.loading("Generating your daily review...");
+    try {
+      const r = await getDailyReview();
+      setReview(r.data);
+      toast.success(`Productivity score: ${r.data.productivityScore}/100`, { id: toastId });
+    } catch {
+      toast.error("Failed to generate review.", { id: toastId });
+    }
   };
 
   useEffect(() => {
@@ -57,9 +73,9 @@ export default function App() {
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => {
-        setTimerSecs(s => {
-          if (s <= 1) { setRunning(false); clearInterval(intervalRef.current); return 0; }
-          return s - 1;
+        setTimerSecs(prev => {
+          if (prev <= 1) { setRunning(false); clearInterval(intervalRef.current); return 0; }
+          return prev - 1;
         });
       }, 1000);
     } else {
@@ -68,17 +84,17 @@ export default function App() {
     return () => clearInterval(intervalRef.current);
   }, [running]);
 
-  const done = tasks.filter(t => t.status === "done").length;
-  const score = tasks.length ? Math.round(50 + (done / tasks.length) * 50) : 50;
+  const done       = tasks.filter(t => t.status === "done").length;
+  const score      = tasks.length ? Math.round(50 + (done / tasks.length) * 50) : 50;
   const focusHours = tasks.filter(t => t.status === "done").reduce((a, t) => a + (t.estimatedTime || 0), 0);
-  const mm = String(Math.floor(timerSecs / 60)).padStart(2, "0");
-  const ss = String(timerSecs % 60).padStart(2, "0");
-  const focusTask = plan[0];
+  const mm         = String(Math.floor(timerSecs / 60)).padStart(2, "0");
+  const ss         = String(timerSecs % 60).padStart(2, "0");
+  const focusTask  = plan[0];
 
   return (
     <div>
-      <div style={s.topbar}>
-        <div style={s.logo}>FOCUS<span style={{ color: "#e8e8e8" }}>AI</span></div>
+      <div style={styles.topbar}>
+        <div style={styles.logo}>FOCUS<span style={{ color: "#e8e8e8" }}>AI</span></div>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           <span style={{ fontFamily: "Space Mono, monospace", fontSize: "12px", color: "#444" }}>{time}</span>
           <span style={{
@@ -90,59 +106,110 @@ export default function App() {
         </div>
       </div>
 
-      <div style={s.statsRow}>
-        <div style={s.statCell}>
-          <div style={s.statNum}>{tasks.length}</div>
-          <div style={s.statLabel}>tasks today</div>
+      <div style={styles.statsRow}>
+        <div style={styles.statCell}>
+          <div style={styles.statNum}>{tasks.length}</div>
+          <div style={styles.statLabel}>tasks today</div>
         </div>
-        <div style={s.statCell}>
-          <div style={s.statNum}>{done}</div>
-          <div style={s.statLabel}>completed</div>
+        <div style={styles.statCell}>
+          <div style={styles.statNum}>{done}</div>
+          <div style={styles.statLabel}>completed</div>
         </div>
-        <div style={{ ...s.statCell, borderRight: "none" }}>
-          <div style={s.statNum}>{focusHours.toFixed(1)}</div>
-          <div style={s.statLabel}>focus hours</div>
+        <div style={{ ...styles.statCell, borderRight: "none" }}>
+          <div style={styles.statNum}>{focusHours.toFixed(1)}</div>
+          <div style={styles.statLabel}>focus hours</div>
         </div>
       </div>
 
-      <div style={s.grid}>
-        <div style={s.panel}>
-          <div style={s.sectionHeader}>
-            <span style={s.label}>task input</span>
-            <span style={{ ...s.label, color: "#1D9E75" }}>AI parsed</span>
+      <div style={styles.grid}>
+
+        {/* LEFT PANEL */}
+        <div style={styles.panel}>
+
+          {/* Tab bar */}
+          <div style={{ display: "flex", borderBottom: "0.5px solid #1e1e1e" }}>
+            {["tasks", "analytics"].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  flex: 1, padding: "11px", background: "transparent", border: "none",
+                  borderBottom: activeTab === tab ? "2px solid #1D9E75" : "2px solid transparent",
+                  color: activeTab === tab ? "#1D9E75" : "#444", cursor: "pointer",
+                  fontFamily: "Space Mono, monospace", fontSize: "10px",
+                  letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.15s"
+                }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
-          <TaskInput onTaskAdded={fetchAll} />
-          <div style={s.sectionHeader}>
-            <span style={s.label}>all tasks</span>
-            <span style={s.label}>{tasks.length} total</span>
-          </div>
-          <TaskList tasks={tasks} onUpdate={fetchAll} />
-          <div style={{ padding: "12px 20px", display: "flex", gap: "8px", borderTop: "0.5px solid #1e1e1e" }}>
-            <button onClick={fetchReview} style={{
-              background: "#0F6E56", border: "none", color: "#fff", borderRadius: "4px",
-              padding: "7px 14px", fontSize: "11px", fontFamily: "Space Mono, monospace",
-              cursor: "pointer", letterSpacing: "0.03em"
-            }}>
-              AI daily review
-            </button>
-          </div>
-          {review && (
-            <div style={{ padding: "12px 20px", borderTop: "0.5px solid #1e1e1e" }}>
-              <div style={{ fontSize: "10px", color: "#1D9E75", fontFamily: "Space Mono, monospace", marginBottom: "6px" }}>
-                DAILY REVIEW
+
+          {activeTab === "tasks" ? (
+            <>
+              <div style={styles.sectionHeader}>
+                <span style={styles.label}>task input</span>
+                <span style={{ ...styles.label, color: "#1D9E75" }}>AI parsed</span>
               </div>
-              <div style={{ fontSize: "12px", color: "#888", lineHeight: 1.6 }}>
-                Completed: {review.completedCount} · Missed: {review.missedCount}<br />
-                Score: {review.productivityScore}/100<br />
-                {review.suggestion}
+              <TaskInput onTaskAdded={fetchAll} />
+
+              <div style={{
+                padding: "10px 20px", borderBottom: "0.5px solid #1e1e1e",
+                display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap"
+              }}>
+                {["all", "pending", "done", "high"].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    style={{
+                      padding: "4px 10px", borderRadius: "4px", cursor: "pointer",
+                      fontSize: "10px", fontFamily: "Space Mono, monospace",
+                      letterSpacing: "0.05em", border: "0.5px solid",
+                      borderColor: filter === f ? "#1D9E75" : "#2a2a2a",
+                      background: filter === f ? "#0a2e22" : "transparent",
+                      color: filter === f ? "#1D9E75" : "#444",
+                      transition: "all 0.15s"
+                    }}
+                  >
+                    {f.toUpperCase()}
+                  </button>
+                ))}
               </div>
-            </div>
+
+              <TaskList tasks={tasks} filter={filter} onUpdate={fetchAll} />
+
+              <div style={{ padding: "12px 20px", borderTop: "0.5px solid #1e1e1e" }}>
+                <button onClick={fetchReview} style={{
+                  background: "#0F6E56", border: "none", color: "#fff", borderRadius: "4px",
+                  padding: "7px 14px", fontSize: "11px", fontFamily: "Space Mono, monospace",
+                  cursor: "pointer", letterSpacing: "0.03em"
+                }}>
+                  AI daily review
+                </button>
+              </div>
+
+              {review && (
+                <div style={{ padding: "12px 20px", borderTop: "0.5px solid #1e1e1e" }}>
+                  <div style={{ fontSize: "10px", color: "#1D9E75", fontFamily: "Space Mono, monospace", marginBottom: "6px" }}>
+                    DAILY REVIEW
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#888", lineHeight: 1.6 }}>
+                    Completed: {review.completedCount} · Missed: {review.missedCount}<br />
+                    Score: {review.productivityScore}/100<br />
+                    {review.suggestion}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <Analytics stats={statsData} />
           )}
         </div>
 
+        {/* RIGHT PANEL */}
         <div>
           <div style={{ padding: "14px 20px", borderBottom: "0.5px solid #1e1e1e", background: "#111" }}>
-            <div style={{ ...s.label, marginBottom: "8px" }}>active focus session</div>
+            <div style={{ ...styles.label, marginBottom: "8px" }}>active focus session</div>
             <div style={{ fontSize: "13px", color: "#e8e8e8", fontWeight: 500, marginBottom: "10px" }}>
               {focusTask ? focusTask.title : "No tasks scheduled"}
             </div>
@@ -184,12 +251,13 @@ export default function App() {
             </div>
           </div>
 
-          <div style={s.sectionHeader}>
-            <span style={s.label}>today's plan</span>
-            <span style={{ ...s.label, color: "#1D9E75" }}>AI scheduled</span>
+          <div style={styles.sectionHeader}>
+            <span style={styles.label}>today's plan</span>
+            <span style={{ ...styles.label, color: "#1D9E75" }}>AI scheduled</span>
           </div>
           <Planner plan={plan} />
         </div>
+
       </div>
     </div>
   );
