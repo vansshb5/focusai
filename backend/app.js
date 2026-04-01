@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import { protect } from "./middleware/authMiddleware.js";
 
 dotenv.config();
 connectDB();
@@ -15,11 +17,11 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
-
 app.use(express.json());
 
-app.use("/tasks", taskRoutes);
-app.use("/ai", aiRoutes);
+app.use("/auth",  authRoutes);
+app.use("/tasks", protect, taskRoutes);
+app.use("/ai",    protect, aiRoutes);
 
 app.get("/", (req, res) => res.send("FocusAI server running"));
 

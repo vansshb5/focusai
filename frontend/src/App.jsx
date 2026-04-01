@@ -1,3 +1,5 @@
+import { Routes, Route, useNavigate } from "react-router-dom";
+import Focus from "./pages/Focus";
 import { useState, useEffect, useRef } from "react";
 import { getTasks, getDailyPlan, getDailyReview, getStats } from "./services/api";
 import TaskInput from "./components/TaskInput";
@@ -5,7 +7,8 @@ import TaskList from "./components/TaskList";
 import Planner from "./components/Planner";
 import Analytics from "./components/Analytics";
 import toast from "react-hot-toast";
-
+import { useAuth } from "./context/AuthContext";
+import AuthPage from "./pages/AuthPage";
 const styles = {
   topbar: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -26,6 +29,19 @@ const styles = {
 };
 
 export default function App() {
+  const { user, logout, loading } = useAuth();
+
+if (loading) return (
+  <div style={{
+    minHeight: "100vh", display: "flex", alignItems: "center",
+    justifyContent: "center", background: "#0e0e0e",
+    fontFamily: "Space Mono, monospace", color: "#1D9E75", fontSize: "12px"
+  }}>
+    LOADING...
+  </div>
+);
+
+if (!user) return <AuthPage />;
   const [tasks, setTasks]       = useState([]);
   const [plan, setPlan]         = useState([]);
   const [review, setReview]     = useState(null);
@@ -95,15 +111,27 @@ export default function App() {
     <div>
       <div style={styles.topbar}>
         <div style={styles.logo}>FOCUS<span style={{ color: "#e8e8e8" }}>AI</span></div>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <span style={{ fontFamily: "Space Mono, monospace", fontSize: "12px", color: "#444" }}>{time}</span>
-          <span style={{
-            background: "#0a2e22", color: "#1D9E75", fontSize: "11px",
-            fontFamily: "Space Mono, monospace", padding: "3px 10px", borderRadius: "20px"
-          }}>
-            Score: {score}
-          </span>
-        </div>
+      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+  <span style={{ fontFamily: "Space Mono, monospace", fontSize: "12px", color: "#444" }}>{time}</span>
+  <span style={{
+    background: "#0a2e22", color: "#1D9E75", fontSize: "11px",
+    fontFamily: "Space Mono, monospace", padding: "3px 10px", borderRadius: "20px"
+  }}>
+    Score: {score}
+  </span>
+  <span style={{ fontSize: "12px", color: "#555" }}>{user.name}</span>
+  <button
+    onClick={() => { logout(); toast.success("Signed out."); }}
+    style={{
+      background: "transparent", border: "0.5px solid #2a2a2a",
+      color: "#444", borderRadius: "4px", padding: "4px 10px",
+      fontSize: "10px", fontFamily: "Space Mono, monospace",
+      cursor: "pointer", letterSpacing: "0.05em"
+    }}
+  >
+    LOGOUT
+  </button>
+</div>
       </div>
 
       <div style={styles.statsRow}>

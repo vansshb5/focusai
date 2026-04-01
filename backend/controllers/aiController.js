@@ -1,4 +1,4 @@
-import { parseTaskWithGrok } from "../services/grokService.js";
+import { parseTaskWithGrok, decomposeGoalWithGroq } from "../services/grokService.js";
 import { generateDailyPlan } from "../services/plannerService.js";
 import Task from "../models/Task.js";
 import { calculatePriority } from "../utils/priorityEngine.js";
@@ -38,10 +38,11 @@ export const parseTask = async (req, res) => {
     if (!text) return res.status(400).json({ error: "No text provided" });
 
     const parsed = await parseTaskWithGrok(text);
-    parsed.deadline = resolveDeadline(parsed.deadline);
+    parsed.deadline      = resolveDeadline(parsed.deadline);
     parsed.priorityScore = calculatePriority(parsed);
-    parsed.aiParsed = true;
-    parsed.rawInput = text;
+    parsed.aiParsed      = true;
+    parsed.rawInput      = text;
+    parsed.user          = req.user._id;
 
     const task = await Task.create(parsed);
     res.status(201).json(task);
@@ -53,7 +54,11 @@ export const parseTask = async (req, res) => {
 
 export const getDailyPlan = async (req, res) => {
   try {
-    const tasks = await Task.find({ status: { $ne: "done" } }).sort({ priorityScore: -1 });
+    const tasks = await Task.find({
+      user: req.user._id,
+      status: { $ne: "done" }
+    }).sort({ priorityScore: -1 });
+
     const plan = generateDailyPlan(tasks);
     res.json(plan);
   } catch (err) {
@@ -63,14 +68,18 @@ export const getDailyPlan = async (req, res) => {
 
 export const getDailyReview = async (req, res) => {
   try {
-    const completed = await Task.find({ status: "done" });
-    const missed = await Task.find({ status: "pending", deadline: { $lt: new Date() } });
+    const completed = await Task.find({ user: req.user._id, status: "done" });
+    const missed    = await Task.find({
+      user: req.user._id,
+      status: "pending",
+      deadline: { $lt: new Date() }
+    });
 
     res.json({
       completedCount: completed.length,
-      missedCount: missed.length,
-      completed: completed.map(t => t.title),
-      missed: missed.map(t => t.title),
+      missedCount:    missed.length,
+      completed:      completed.map(t => t.title),
+      missed:         missed.map(t => t.title),
       productivityScore: Math.min(100, Math.round(
         (completed.length / (completed.length + missed.length || 1)) * 100
       )),
@@ -80,5 +89,33 @@ export const getDailyReview = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+export const decomposeGoal = async (req, res) => {
+  try {
+    const { goal } = req.body;
+    if (!goal) return res.status(400).json({ error: "No goal provided" });
+
+    const subtasks = await decomposeGoalWithGroq(goal);
+
+    const savedTasks = await Promise.all(
+      subtasks.map(async (task) => {
+        task.user          = req.user._id;
+        task.priorityScore = calculatePriority(task);
+        task.aiParsed      = true;
+        task.rawInput      = goal;
+        return Task.create(task);
+      })
+    );
+
+    res.status(201).json({
+      goal,
+      count: savedTasks.length,
+      tasks: savedTasks
+    });
+  } catch (err) {
+    console.error("Decompose error:", err.message);
+    res.status(500).json({ error: "Goal decomposition failed", detail: err.message });
   }
 };
