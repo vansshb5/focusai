@@ -11,9 +11,13 @@ dotenv.config();
 connectDB();
 
 const app = express();
-
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:4173"],
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:4173",
+    "https://focusai.vercel.app",        // update this after Vercel deploy
+    /\.vercel\.app$/                      // allows any vercel preview URL
+  ],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
