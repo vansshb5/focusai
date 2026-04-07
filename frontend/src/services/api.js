@@ -2,7 +2,10 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = axios.create({ 
+  baseURL: BASE_URL ,
+  withCredentials: true
+});
 
 // ✅ Attach token to the api instance, not the global axios
 api.interceptors.request.use((config) => {
