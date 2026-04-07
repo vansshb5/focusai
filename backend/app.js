@@ -15,7 +15,7 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "http://localhost:4173",
-    "https://focusai-amber.vercel.app/",        // update this after Vercel deploy
+    "https://focusai-amber.vercel.app",        // update this after Vercel deploy
     /\.vercel\.app$/                      // allows any vercel preview URL
   ],
   methods: ["GET", "POST", "PUT", "DELETE"],
