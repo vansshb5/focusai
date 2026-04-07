@@ -9,10 +9,12 @@ import { protect } from "./middleware/authMiddleware.js";
 
 dotenv.config();
 connectDB();
-
+console.log("NEW CORS CONFIG LOADED");
 const app = express();
 app.use(cors({
   origin: (origin, callback) => {
+    console.log("Incoming origin:", origin);
+
     const allowed = [
       "http://localhost:5173",
       "http://localhost:4173",
@@ -24,8 +26,10 @@ app.use(cors({
       allowed.includes(origin) ||
       /^https:\/\/.*\.vercel\.app$/.test(origin)
     ) {
+      console.log("CORS allowed");
       callback(null, true);
     } else {
+      console.log("CORS blocked:", origin);
       callback(new Error(`Blocked by CORS: ${origin}`));
     }
   },
