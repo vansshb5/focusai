@@ -9,36 +9,18 @@ import { protect } from "./middleware/authMiddleware.js";
 
 dotenv.config();
 connectDB();
-console.log("NEW CORS CONFIG LOADED");
+
 const app = express();
 app.use(cors({
-  origin: (origin, callback) => {
-    console.log("Incoming origin:", origin);
-
-    const allowed = [
-      "http://localhost:5173",
-      "http://localhost:4173",
-      "https://focusai-amber.vercel.app"
-    ];
-
-    if (
-      !origin ||
-      allowed.includes(origin) ||
-      /^https:\/\/.*\.vercel\.app$/.test(origin)
-    ) {
-      console.log("CORS allowed");
-      callback(null, true);
-    } else {
-      console.log("CORS blocked:", origin);
-      callback(new Error(`Blocked by CORS: ${origin}`));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  origin: [
+    "http://localhost:5173",
+   
+    "https://focusai-amber.vercel.app",        // update this after Vercel deploy
+    /\.vercel\.app$/                      // allows any vercel preview URL
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
-
-app.options("*", cors());
 app.use(express.json());
 
 app.use("/auth",  authRoutes);
