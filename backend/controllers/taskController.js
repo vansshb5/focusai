@@ -26,7 +26,7 @@ export const updateTask = async (req, res) => {
     const task = await Task.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id },
       req.body,
-      { new: true }
+      { new: true, returnDocument: "after" }
     );
     if (!task) return res.status(404).json({ error: "Task not found" });
     res.json(task);
@@ -37,13 +37,14 @@ export const updateTask = async (req, res) => {
 
 export const deleteTask = async (req, res) => {
   try {
-    await Task.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+    await Task.findOneAndDelete(
+      { _id: req.params.id, user: req.user._id }
+    );
     res.json({ message: "Task deleted" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
 export const getStats = async (req, res) => {
   try {
     const allTasks = await Task.find({ user: req.user._id });
